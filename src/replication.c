@@ -576,6 +576,7 @@ void replicationFeedStreamFromMasterStream(char *buf, size_t buflen) {
 void replicationFeedMonitors(client *c, list *monitors, int dictid, robj **argv, int argc) {
     /* Fast path to return if the monitors list is empty or the server is in loading. */
     if (monitors == NULL || listLength(monitors) == 0 || server.loading) return;
+
     listNode *ln;
     listIter li;
     int j;
@@ -593,7 +594,7 @@ void replicationFeedMonitors(client *c, list *monitors, int dictid, robj **argv,
         cmdrepr = sdscatprintf(cmdrepr,"[%d %s] ",dictid,getClientPeerId(c));
     }
 
-    for (j = 0; j < argc; j++) {
+    for (j = 0; j < argc; j++) { // YLB argv[0] is the Redis Command name.
         if (argv[j]->encoding == OBJ_ENCODING_INT) {
             cmdrepr = sdscatprintf(cmdrepr, "\"%ld\"", (long)argv[j]->ptr);
         } else {
@@ -603,12 +604,19 @@ void replicationFeedMonitors(client *c, list *monitors, int dictid, robj **argv,
         if (j != argc-1)
             cmdrepr = sdscatlen(cmdrepr," ",1);
     }
-    cmdrepr = sdscatlen(cmdrepr,"\r\n",2);
+    cmdrepr = sdscat(cmdrepr, c->realcmd->declared_name);
+    cmdrepr = sdscatlen(cmdrepr," Test \r\n",8); // YLB cmdrepr is the REPLY TO MONITOR clients. TODO filter the commands in this method
     cmdobj = createObject(OBJ_STRING,cmdrepr);
 
     listRewind(monitors,&li);
     while((ln = listNext(&li))) {
         client *monitor = ln->value;
+
+        // YLB filtering test ... use monitor ->argc ->argv
+        if (argv[0]->encoding != OBJ_ENCODING_INT && strcmp(c->realcmd->declared_name, "set") == 0 ) {
+            return;
+        }
+
         addReply(monitor,cmdobj);
         updateClientMemUsageAndBucket(monitor);
     }

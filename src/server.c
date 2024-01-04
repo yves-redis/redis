@@ -6183,6 +6183,18 @@ void monitorCommand(client *c) {
     c->flags |= (CLIENT_SLAVE|CLIENT_MONITOR);
     listAddNodeTail(server.monitors,c);
     addReply(c,shared.ok);
+
+    // YLB filtering test ... use monitor ->argc ->argv
+    for (int i = 0; i < c->argc; i++){
+        fprintf(stderr, "+ %s ", (char*)c->argv[i]->ptr);
+    }
+    fprintf(stderr, "\n");
+        if (c->cmd && c->cmd->declared_name) fprintf(stderr, "-cmd %s \n", c->cmd->declared_name);
+        if (c->lastcmd && c->lastcmd->declared_name) fprintf(stderr, "-lastcmd %s \n", c->lastcmd->declared_name);
+        if (c->realcmd && c->realcmd->declared_name) fprintf(stderr, "-realcmd %s \n", c->realcmd->declared_name);
+        fprintf(stderr, "-argc %d \n", c->argc);
+        fprintf(stderr, "-original_argc %d \n", c->original_argc);
+    fprintf(stderr, "\n");
 }
 
 /* =================================== Main! ================================ */

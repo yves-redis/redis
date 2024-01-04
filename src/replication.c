@@ -594,7 +594,7 @@ void replicationFeedMonitors(client *c, list *monitors, int dictid, robj **argv,
         cmdrepr = sdscatprintf(cmdrepr,"[%d %s] ",dictid,getClientPeerId(c));
     }
 
-    for (j = 0; j < argc; j++) { // YLB argv[0] is the Redis Command name.
+    for (j = 0; j < argc; j++) {
         if (argv[j]->encoding == OBJ_ENCODING_INT) {
             cmdrepr = sdscatprintf(cmdrepr, "\"%ld\"", (long)argv[j]->ptr);
         } else {
@@ -618,12 +618,12 @@ void replicationFeedMonitors(client *c, list *monitors, int dictid, robj **argv,
         //     fprintf(stderr, "- %s ", (char*)monitor->original_argv[i]->ptr);
         // }
         // fprintf(stderr, "\n");
-        fprintf(stderr, "-original_argc %d \n", monitor->original_argc);
-        fprintf(stderr, "-argc %d \n", monitor->argc);
         if (monitor->cmd && monitor->cmd->declared_name) fprintf(stderr, "-cmd %s \n", monitor->cmd->declared_name);
         if (monitor->lastcmd && monitor->lastcmd->declared_name) fprintf(stderr, "-lastcmd %s \n", monitor->lastcmd->declared_name);
         if (monitor->realcmd && monitor->realcmd->declared_name) fprintf(stderr, "-realcmd %s \n", monitor->realcmd->declared_name);
-
+        fprintf(stderr, "-argc %d \n", monitor->argc);
+        fprintf(stderr, "-original_argc %d \n", monitor->original_argc);
+        
         if (argv[0]->encoding != OBJ_ENCODING_INT && strcmp(c->realcmd->declared_name, "set") == 0 ) {
             continue;
         }

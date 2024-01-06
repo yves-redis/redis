@@ -6170,22 +6170,22 @@ void infoCommand(client *c) {
 // use server.commands to make sure the filter arguments are correct and remove the wrong ones with a warning reply?
 // create a list in the client c to list the commands to filter, we need to free the list when we freeClient
 void saveMonitorFiltersFromArguments(client *c) {
-    if (c->argc == 1) return; // no filters
+    if (c->argc == 1) return; /* MONITOR does not have filters */
 
-    if ((c->monitor_filters = listCreate()) == NULL){
+    if ((c->monitor_filters = listCreate()) == NULL) {
         fprintf(stderr, "monitor_filters list creation failed.\n");
         exit(1);
     }
 
-    // check filters are existing commands
-    for (int i = 1; i < c->argc; i++){
-        fprintf(stderr, "+ %s", (char*)c->argv[i]->ptr);
+    for (int i = 1; i < c->argc; i++) {
         struct redisCommand *cmd = dictFetchValue(server.commands, c->argv[i]->ptr);
         if (cmd) {
             fprintf(stderr, " == %s \n", cmd->declared_name);
-            listAddNodeTail(c->monitor_filters, cmd);
+            if (listSearchKey(c->monitor_filters, cmd) == NULL) {
+                listAddNodeTail(c->monitor_filters, cmd);
+            }
         } else {
-            fprintf(stderr, "\n");
+            fprintf(stderr, "DEBUG: %s is not a Redis command.\n", (char*)c->argv[i]->ptr);
         }
     }
 }

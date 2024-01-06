@@ -6166,6 +6166,8 @@ void infoCommand(client *c) {
     return;
 }
 
+//YLB
+static client *watch_client;
 void monitorCommand(client *c) {
     if (c->flags & CLIENT_DENY_BLOCKING) {
         /**
@@ -6179,10 +6181,24 @@ void monitorCommand(client *c) {
     if (c->flags & CLIENT_SLAVE) return;
 
 // YLB TODO check all the arguments are real commands we can filter on
-
+watch_client = c;
     c->flags |= (CLIENT_SLAVE|CLIENT_MONITOR);
     listAddNodeTail(server.monitors,c);
     addReply(c,shared.ok);
+
+// YLB
+// use server.commands to make sure the filter arguments are correct and remove the wrong ones with a warning reply?
+// create a list in the client c to list the commands to filter, we need to free the list when we freeClient (and freeClientAsync?).
+        // c->cmd = c->lastcmd = c->realcmd = lookupCommand(c->argv,c->argc);
+        // sds err;
+        // if (!commandCheckExistence(c, &err)) {
+        //     rejectCommandSds(c, err);
+        //     return C_OK;
+        // }
+        // if (!commandCheckArity(c, &err)) {
+        //     rejectCommandSds(c, err);
+        //     return C_OK;
+        // }
 
     // YLB filtering test ... use monitor ->argc ->argv
     for (int i = 0; i < c->argc; i++){

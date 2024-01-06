@@ -6167,7 +6167,29 @@ void infoCommand(client *c) {
 }
 
 //YLB
-static client *watch_client;
+// use server.commands to make sure the filter arguments are correct and remove the wrong ones with a warning reply?
+// create a list in the client c to list the commands to filter, we need to free the list when we freeClient
+void saveMonitorFiltersFromArguments(client *c) {
+    if (c->argc == 1) return; // no filters
+
+    if ((c->monitor_filters = listCreate()) == NULL){
+        fprintf(stderr, "monitor_filters list creation failed.\n");
+        exit(1);
+    }
+
+    // check filters are existing commands
+    for (int i = 1; i < c->argc; i++){
+        fprintf(stderr, "+ %s", (char*)c->argv[i]->ptr);
+        struct redisCommand *cmd = dictFetchValue(server.commands, c->argv[i]->ptr);
+        if (cmd) {
+            fprintf(stderr, " == %s \n", cmd->declared_name);
+            listAddNodeTail(c->monitor_filters, cmd);
+        } else {
+            fprintf(stderr, "\n");
+        }
+    }
+}
+
 void monitorCommand(client *c) {
     if (c->flags & CLIENT_DENY_BLOCKING) {
         /**
@@ -6179,38 +6201,10 @@ void monitorCommand(client *c) {
 
     /* ignore MONITOR if already slave or in monitor mode */
     if (c->flags & CLIENT_SLAVE) return;
-
-// YLB TODO check all the arguments are real commands we can filter on
-watch_client = c;
     c->flags |= (CLIENT_SLAVE|CLIENT_MONITOR);
+    saveMonitorFiltersFromArguments(c);
     listAddNodeTail(server.monitors,c);
     addReply(c,shared.ok);
-
-// YLB
-// use server.commands to make sure the filter arguments are correct and remove the wrong ones with a warning reply?
-// create a list in the client c to list the commands to filter, we need to free the list when we freeClient (and freeClientAsync?).
-        // c->cmd = c->lastcmd = c->realcmd = lookupCommand(c->argv,c->argc);
-        // sds err;
-        // if (!commandCheckExistence(c, &err)) {
-        //     rejectCommandSds(c, err);
-        //     return C_OK;
-        // }
-        // if (!commandCheckArity(c, &err)) {
-        //     rejectCommandSds(c, err);
-        //     return C_OK;
-        // }
-
-    // YLB filtering test ... use monitor ->argc ->argv
-    for (int i = 0; i < c->argc; i++){
-        fprintf(stderr, "+ %s ", (char*)c->argv[i]->ptr);
-    }
-    fprintf(stderr, "\n");
-        if (c->cmd && c->cmd->declared_name) fprintf(stderr, "-cmd %s \n", c->cmd->declared_name);
-        if (c->lastcmd && c->lastcmd->declared_name) fprintf(stderr, "-lastcmd %s \n", c->lastcmd->declared_name);
-        if (c->realcmd && c->realcmd->declared_name) fprintf(stderr, "-realcmd %s \n", c->realcmd->declared_name);
-        fprintf(stderr, "-argc %d \n", c->argc);
-        fprintf(stderr, "-original_argc %d \n", c->original_argc);
-    fprintf(stderr, "\n");
 }
 
 /* =================================== Main! ================================ */

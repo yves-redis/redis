@@ -6172,6 +6172,8 @@ void infoCommand(client *c) {
 void saveMonitorFiltersFromArguments(client *c) {
     if (c->argc == 1) return; /* MONITOR does not have filters */
 
+    int filter_count = 0;
+
     if ((c->monitor_filters = listCreate()) == NULL) {
         fprintf(stderr, "monitor_filters list creation failed.\n");
         exit(1);
@@ -6183,11 +6185,20 @@ void saveMonitorFiltersFromArguments(client *c) {
             fprintf(stderr, " == %s \n", cmd->declared_name);
             if (listSearchKey(c->monitor_filters, cmd) == NULL) {
                 listAddNodeTail(c->monitor_filters, cmd);
+                filter_count++;
             }
         } else {
             fprintf(stderr, "DEBUG: %s is not a Redis command.\n", (char*)c->argv[i]->ptr);
         }
     }
+
+    /* if no commands were added to the filter */
+    if (filter_count == 0) {
+        listRelease(c->monitor_filters);
+        c->monitor_filters = NULL;
+    }
+
+    // YLB TODO add to the reply the commands that will be filtered, the incorrect ones, and or that no command filters were added?
 }
 
 void monitorCommand(client *c) {

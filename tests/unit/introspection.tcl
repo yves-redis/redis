@@ -170,16 +170,15 @@ start_server {tags {"introspection"}} {
         set _ $res
     } {*"set" "foo"*"get" "foo"*}
 
-    test {MONITOR with filters can log executed commands} {
+    test {MONITOR with filters do not log executed commands} {
         set rd [redis_deferring_client]
-        $rd monitor set get
+        $rd monitor get
         assert_match {*OK*} [$rd read]
         r set foo bar
         r get foo
-        set res [list [$rd read] [$rd read]]
+        assert_match {*"get" "foo"*}  [$rd read]
         $rd close
-        set _ $res
-    } {*"set" "foo"*"get" "foo"*}
+    }
 
     test {MONITOR can log commands issued by the scripting engine} {
         set rd [redis_deferring_client]

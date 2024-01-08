@@ -6184,8 +6184,8 @@ sds saveMonitorFiltersFromArguments(client *c) {
         if (cmd && listSearchKey(c->monitor_filters, cmd) == NULL) {
             listAddNodeTail(c->monitor_filters, cmd);
         } else {
-            incorrect_args = sdscat(incorrect_args, (char *)c->argv[i]->ptr);
-            incorrect_args = sdscat(incorrect_args, " ");
+            // YLB TODO add if QUIT or AUTH as Monitor does not log them?
+            incorrect_args = sdscatfmt(incorrect_args, "'%s' ", (char *)c->argv[i]->ptr);
         }
     }
 
@@ -6205,13 +6205,13 @@ void monitorCommand(client *c) {
     if (c->flags & CLIENT_SLAVE) return;
 
     sds incorrect_args = saveMonitorFiltersFromArguments(c);
-    if (sdslen(incorrect_args) == 0) {
+    if (sdslen(incorrect_args) != 0) {
+        incorrect_args = sdscat(incorrect_args, "argument(s) are not Redis command(s).");
+        addReplyError(c, incorrect_args);
+    } else {
         c->flags |= (CLIENT_SLAVE|CLIENT_MONITOR);
         listAddNodeTail(server.monitors,c);
         addReply(c,shared.ok);
-    } else {
-        incorrect_args = sdscat(incorrect_args, "argument(s) are not Redis command(s).");
-        addReplyError(c, incorrect_args);
     }
     sdsfree(incorrect_args);
 }

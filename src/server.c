@@ -6181,8 +6181,10 @@ sds saveMonitorFiltersFromArguments(client *c) {
     for (int i = 1; i < c->argc; i++) {
         struct redisCommand *cmd = dictFetchValue(server.commands, c->argv[i]->ptr);
 
-        if (cmd && listSearchKey(c->monitor_filters, cmd) == NULL) {
-            listAddNodeTail(c->monitor_filters, cmd);
+        if (cmd) {
+            if (listSearchKey(c->monitor_filters, cmd) == NULL) { /* no duplicate command */
+                listAddNodeTail(c->monitor_filters, cmd);
+            }
         } else {
             // YLB TODO add if QUIT or AUTH as Monitor does not log them?
             incorrect_args = sdscatfmt(incorrect_args, "'%s' ", (char *)c->argv[i]->ptr);

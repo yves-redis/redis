@@ -6204,11 +6204,10 @@ void monitorCommand(client *c) {
     /* ignore MONITOR if already slave or in monitor mode */
     if (c->flags & CLIENT_SLAVE) return;
 
-    c->flags |= (CLIENT_SLAVE|CLIENT_MONITOR);
-    listAddNodeTail(server.monitors,c);
-
     sds incorrect_args = saveMonitorFiltersFromArguments(c);
     if (sdslen(incorrect_args) == 0) {
+        c->flags |= (CLIENT_SLAVE|CLIENT_MONITOR);
+        listAddNodeTail(server.monitors,c);
         addReply(c,shared.ok);
     } else {
         incorrect_args = sdscat(incorrect_args, "argument(s) are not Redis command(s).");

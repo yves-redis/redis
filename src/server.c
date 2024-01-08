@@ -6166,39 +6166,30 @@ void infoCommand(client *c) {
     return;
 }
 
-//YLB
-// use server.commands to make sure the filter arguments are correct and remove the wrong ones with a warning reply?
-// create a list in the client c to list the commands to filter, we need to free the list when we freeClient
-void saveMonitorFiltersFromArguments(client *c) {
-    if (c->argc == 1) return; /* MONITOR does not have filters */
+sds saveMonitorFiltersFromArguments(client *c) {
+    sds incorrect_args = sdsempty();
 
-    int filter_count = 0;
+    if (c->argc == 1) return incorrect_args; /* MONITOR does not have filters/arguments */
 
+    /* even if we do not have a valid argument, monitor_filters will be cleaned in freeClient() */
     if ((c->monitor_filters = listCreate()) == NULL) {
         fprintf(stderr, "monitor_filters list creation failed.\n");
         exit(1);
     }
 
+    /* validate arguments are commands */
     for (int i = 1; i < c->argc; i++) {
         struct redisCommand *cmd = dictFetchValue(server.commands, c->argv[i]->ptr);
-        if (cmd) {
-            fprintf(stderr, " == %s \n", cmd->declared_name);
-            if (listSearchKey(c->monitor_filters, cmd) == NULL) {
-                listAddNodeTail(c->monitor_filters, cmd);
-                filter_count++;
-            }
+
+        if (cmd && listSearchKey(c->monitor_filters, cmd) == NULL) {
+            listAddNodeTail(c->monitor_filters, cmd);
         } else {
-            fprintf(stderr, "DEBUG: %s is not a Redis command.\n", (char*)c->argv[i]->ptr);
+            incorrect_args = sdscat(incorrect_args, (char *)c->argv[i]->ptr);
+            incorrect_args = sdscat(incorrect_args, " ");
         }
     }
 
-    /* if no commands were added to the filter */
-    if (filter_count == 0) {
-        listRelease(c->monitor_filters);
-        c->monitor_filters = NULL;
-    }
-
-    // YLB TODO add to the reply the commands that will be filtered, the incorrect ones, and or that no command filters were added?
+    return incorrect_args;
 }
 
 void monitorCommand(client *c) {
@@ -6212,10 +6203,18 @@ void monitorCommand(client *c) {
 
     /* ignore MONITOR if already slave or in monitor mode */
     if (c->flags & CLIENT_SLAVE) return;
+
     c->flags |= (CLIENT_SLAVE|CLIENT_MONITOR);
-    saveMonitorFiltersFromArguments(c);
     listAddNodeTail(server.monitors,c);
-    addReply(c,shared.ok);
+
+    sds incorrect_args = saveMonitorFiltersFromArguments(c);
+    if (sdslen(incorrect_args) == 0) {
+        addReply(c,shared.ok);
+    } else {
+        incorrect_args = sdscat(incorrect_args, "argument(s) are not Redis command(s).");
+        addReplyError(c, incorrect_args);
+    }
+    sdsfree(incorrect_args);
 }
 
 /* =================================== Main! ================================ */

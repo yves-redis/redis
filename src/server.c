@@ -6182,12 +6182,12 @@ sds saveMonitorFiltersFromArguments(client *c) {
         struct redisCommand *cmd = dictFetchValue(server.commands, c->argv[i]->ptr);
 
         if (cmd) {
-            if (listSearchKey(c->monitor_filters, cmd) == NULL) { /* no duplicate command */
+            if (listSearchKey(c->monitor_filters, cmd) == NULL) { /* no duplicate */
                 listAddNodeTail(c->monitor_filters, cmd);
             }
         } else {
             // YLB TODO add if QUIT or AUTH as Monitor does not log them?
-            incorrect_args = sdscatfmt(incorrect_args, "'%s' ", (char *)c->argv[i]->ptr);
+            incorrect_args = sdscatfmt(incorrect_args, " '%s'", (char *)c->argv[i]->ptr);
         }
     }
 
@@ -6208,8 +6208,7 @@ void monitorCommand(client *c) {
 
     sds incorrect_args = saveMonitorFiltersFromArguments(c);
     if (sdslen(incorrect_args) != 0) {
-        incorrect_args = sdscat(incorrect_args, "argument(s) are not Redis command(s).");
-        addReplyError(c, incorrect_args);
+        addReplyErrorFormat(c, "%s argument(s) are not Redis command(s).", incorrect_args);
     } else {
         c->flags |= (CLIENT_SLAVE|CLIENT_MONITOR);
         listAddNodeTail(server.monitors,c);

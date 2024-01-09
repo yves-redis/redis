@@ -6180,7 +6180,6 @@ sds saveMonitorFiltersFromArguments(client *c) {
     /* validate arguments are commands */
     for (int i = 1; i < c->argc; i++) {
         struct redisCommand *cmd = dictFetchValue(server.commands, c->argv[i]->ptr);
-
         if (cmd) {
             if (listSearchKey(c->monitor_filters, cmd) == NULL) { /* no duplicate */
                 listAddNodeTail(c->monitor_filters, cmd);

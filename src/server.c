@@ -6195,9 +6195,9 @@ sds saveMonitorFiltersFromArguments(client *c) {
     if (sdslen(incorrect_args) == 0) {
         sdsfree(incorrect_args);
         return NULL;
+    } else {
+        return incorrect_args;
     }
-    
-    return incorrect_args;
 }
 
 void monitorCommand(client *c) {

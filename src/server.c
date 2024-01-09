@@ -6167,7 +6167,7 @@ void infoCommand(client *c) {
 }
 
 /* Check that c->agrv are Redis commands and add them to c->monitor_filters 
- * returns NULL a list of incorrect arguments (that were not Redis commands) */
+ * returns NULL or a list of incorrect arguments (that are not Redis commands) */
 sds saveMonitorFiltersFromArguments(client *c) {
     if (c->argc == 1) return NULL; /* MONITOR does not have filters/arguments */
 

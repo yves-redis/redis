@@ -6166,10 +6166,12 @@ void infoCommand(client *c) {
     return;
 }
 
+/* Check that c->agrv are Redis commands and add them to c->monitor_filters 
+ * returns NULL a list of incorrect arguments (that were not Redis commands) */
 sds saveMonitorFiltersFromArguments(client *c) {
-    sds incorrect_args = sdsempty();
+    if (c->argc == 1) return NULL; /* MONITOR does not have filters/arguments */
 
-    if (c->argc == 1) return incorrect_args; /* MONITOR does not have filters/arguments */
+    sds incorrect_args = sdsempty();
 
     /* even if we do not have a valid argument, monitor_filters will be cleaned in freeClient() */
     if ((c->monitor_filters = listCreate()) == NULL) {
@@ -6190,6 +6192,11 @@ sds saveMonitorFiltersFromArguments(client *c) {
         }
     }
 
+    if (sdslen(incorrect_args) == 0) {
+        sdsfree(incorrect_args);
+        return NULL;
+    }
+    
     return incorrect_args;
 }
 
@@ -6206,14 +6213,15 @@ void monitorCommand(client *c) {
     if (c->flags & CLIENT_SLAVE) return;
 
     sds incorrect_args = saveMonitorFiltersFromArguments(c);
-    if (sdslen(incorrect_args) != 0) {
+    if (incorrect_args != NULL) {
         addReplyErrorFormat(c, "%s argument(s) are not Redis command(s).", incorrect_args);
-    } else {
-        c->flags |= (CLIENT_SLAVE|CLIENT_MONITOR);
-        listAddNodeTail(server.monitors,c);
-        addReply(c,shared.ok);
+        sdsfree(incorrect_args);
+        return;
     }
-    sdsfree(incorrect_args);
+    
+    c->flags |= (CLIENT_SLAVE|CLIENT_MONITOR);
+    listAddNodeTail(server.monitors,c);
+    addReply(c,shared.ok);
 }
 
 /* =================================== Main! ================================ */

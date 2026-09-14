@@ -888,16 +888,69 @@ start_server {tags {"cli external:skip"}} {
 }
 
 start_server {tags {"cli external:skip"}} {
-    test "keystats on empty database should not produce garbage stats" {
-        # On an empty DB the keystats histogram has total_count = 0. Verify hdr_mean(), hdr_stddev(),
-        # and the percentile calculation handle this gracefully.
-        set cmd [rediscli [srv host] [srv port] [list --keystats]]
-        catch {exec {*}$cmd 2>@1} result
+    test "key size analysis does not alter key LRU metadata" {
+        foreach mode {--bigkeys --memkeys --keystats} {
+            r set key value
+            after 1100
+            set idle_before [r object idletime key]
+
+            set cmd [rediscli [srv host] [srv port] [list -n $::dbnum $mode]]
+            exec {*}$cmd
+
+            assert_morethan_equal [r object idletime key] $idle_before
+        }
+        r del key
+    }
+
+    test "key size analysis does not alter key LFU metadata" {
+        r config set maxmemory-policy allkeys-lfu
+        r config set lfu-log-factor 0
+
+        foreach mode {--bigkeys --memkeys --keystats} {
+            r set key value
+            set freq_before [r object freq key]
+
+            set cmd [rediscli [srv host] [srv port] [list -n $::dbnum $mode]]
+            exec {*}$cmd
+
+            assert_equal [r object freq key] $freq_before
+        }
+
+        r del key
+        r config set maxmemory-policy noeviction
+        r config set lfu-log-factor 10
+    }
+
+    test "key size analysis continues when CLIENT NO-TOUCH is unavailable" {
+        r acl setuser keystats-user on >password ~* +@all -client
+        r set key value
+
+        set cmd [rediscli [srv host] [srv port] \
+            [list -n $::dbnum --user keystats-user -a password --no-auth-warning --keystats]]
+        assert_equal 0 [catch {exec {*}$cmd 2>@1} result]
         assert_match "*Scanning the entire keyspace*" $result
 
-        # The "Note:" line with Mean/StdDeviation is only printed when displayKeyStatsSizeDist()
-        # compute stats. When keysize_histogram->total_count == 0, it should be skipped entirely.
+        r del key
+        r acl deluser keystats-user
+    }
+
+    test "keystats exits before scanning an empty database" {
+        assert_equal 0 [r dbsize]
+        r config resetstat
+        set cmd [rediscli [srv host] [srv port] [list -n $::dbnum --keystats]]
+        assert_equal "The database is empty." [exec {*}$cmd]
+        assert_no_match "*cmdstat_scan:*" [r info commandstats]
+    }
+
+    test "keystats with no matching keys should not produce garbage stats" {
+        # A nonempty database can still produce an empty histogram when no keys match.
+        r set key value
+        set cmd [rediscli [srv host] [srv port] [list -n $::dbnum --keystats --pattern missing:*]]
+        set result [exec {*}$cmd]
+        assert_match "*Scanning the entire keyspace*" $result
         assert_match "*No key size samples collected*" $result
+        assert_no_match "*StdDeviation:*" $result
+        r del key
     }
 }
 

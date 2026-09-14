@@ -9682,6 +9682,22 @@ static void pipeMode(void) {
 static redisReply *sendScan(unsigned long long *it) {
     redisReply *reply;
 
+    /* The key size commands used by --bigkeys and --keystats normally update
+     * the LRU/LFU metadata of the keys they inspect. Try to enable no-touch
+     * before the first SCAN so all key inspection performed by the size
+     * analysis modes leaves eviction metadata unchanged. Ignore error replies
+     * for compatibility with servers that don't support CLIENT NO-TOUCH. */
+    static int no_touch_attempted = 0;
+    if (!no_touch_attempted && (config.bigkeys || config.memkeys || config.keystats)) {
+        reply = redisCommand(context, "CLIENT NO-TOUCH ON");
+        if (reply == NULL) {
+            fprintf(stderr, "\nI/O error\n");
+            exit(1);
+        }
+        freeReplyObject(reply);
+        no_touch_attempted = 1;
+    }
+
     if (config.pattern)
         reply = redisCommand(context, "SCAN %llu MATCH %b COUNT %d",
             *it, config.pattern, sdslen(config.pattern), config.count);
@@ -11108,6 +11124,13 @@ static void keyStats(long long memkeys_samples, unsigned long long cursor, unsig
     list *top_sizes;
     long long refresh_time = mstime();
 
+    /* Skip setup and scanning when the selected database is empty. */
+    total_keys = getDbSize();
+    if (total_keys == 0) {
+        printf("The database is empty.\n");
+        exit(0);
+    }
+
     if (cursor != 0) {
         it = cursor;
     }
@@ -11158,9 +11181,6 @@ static void keyStats(long long memkeys_samples, unsigned long long cursor, unsig
     }
 
     signal(SIGINT, longStatLoopModeStop);
-
-    /* Total keys pre scanning */
-    total_keys = getDbSize();
 
     /* Status message */
     printf("\n# Scanning the entire keyspace to find the biggest keys and distribution information.\n");
